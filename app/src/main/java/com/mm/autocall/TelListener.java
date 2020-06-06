@@ -14,6 +14,8 @@ public class TelListener extends PhoneStateListener {
         switch (state) {
             case TelephonyManager.CALL_STATE_IDLE: // 空闲状态，即无来电也无去电
                 Log.i("TelephoneState", "IDLE");
+
+
                 //此处添加一系列功能代码
                 break;
             case TelephonyManager.CALL_STATE_RINGING: // 来电响铃
