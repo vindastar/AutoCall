@@ -10,6 +10,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -30,15 +32,24 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     EditText et_phoneStartNum, et_callPhoneCount, et_waitSecond, et_callSpace;
-    Button btn_start, btn_pause;
+    Button btn_start, btn_pause, btn_check;
     TextView textViewLog;
 
     boolean isRun;
@@ -83,10 +94,77 @@ public class MainActivity extends AppCompatActivity {
                 case 2:
                     startWork(curPhoneNum, waitSecondSec);
                     break;
+                case 3:
+                    textViewLog.setText("快去自如等待租房子!");
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                doGet("https://sc.ftqq.com/SCU91479T874dbeeafc0118246217ec541e4cad175e7ee288d33e2.send?text=快去自如等待租房子~\n" + formatTime());
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }).start();
+                case 4:
+                    textViewLog.setText(formatTime() + ": 找房第  " + zhaofangCount + "  次");
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            textViewLog.setText(formatTime() + ": 找房第  " + zhaofangCount + "  次");
+                            btn_check.callOnClick();
+                        }
+                    }, 350 * 1000);
             }
         }
     };
 
+    public String doGet(String URL) {
+        HttpURLConnection conn = null;
+        InputStream is = null;
+        BufferedReader br = null;
+        StringBuilder result = new StringBuilder();
+        try {
+            //创建远程url连接对象
+            URL url = new URL(URL);
+            //通过远程url连接对象打开一个连接，强转成HTTPURLConnection类
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            //设置连接超时时间和读取超时时间
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(60000);
+            conn.setRequestProperty("Accept", "application/json");
+            //发送请求
+            conn.connect();
+            //通过conn取得输入流，并使用Reader读取
+            if (200 == conn.getResponseCode()) {
+                is = conn.getInputStream();
+                br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+                String line;
+                while ((line = br.readLine()) != null) {
+                    result.append(line);
+                    System.out.println(line);
+                }
+            } else {
+                System.out.println("ResponseCode is an error code:" + conn.getResponseCode());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (br != null) {
+                    br.close();
+                }
+                if (is != null) {
+                    is.close();
+                }
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+            conn.disconnect();
+        }
+        return result.toString();
+    }
 
     private void endCall() {
         try {
@@ -122,6 +200,7 @@ public class MainActivity extends AppCompatActivity {
         et_callSpace = (EditText) findViewById(R.id.callSpace);
         btn_start = (Button) findViewById(R.id.btn_start);
         btn_pause = (Button) findViewById(R.id.btn_pause);
+        btn_check = (Button) findViewById(R.id.btn_check);
         textViewLog = (TextView) findViewById(R.id.textViewLog);
         /**
          * 在activity 或者 service中加入如下代码，以实现来电状态监听
@@ -159,6 +238,54 @@ public class MainActivity extends AppCompatActivity {
                 textViewLog.setText(textViewLog.getText() + "\n暂停了，当前是第: " + curCount + "\n----------↑");
             }
         });
+
+
+        btn_check.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        String s = getWebContent("http://sh.ziroom.com/x/807488012.html");
+                        Log.d("TAG", "XXXXXX s . length() " + s.length());
+                        if (s.contains("检测中") || s.length() < 500) {
+                            Log.d("TAG", "XXXXXXXXXXXXX");
+                            handler.sendEmptyMessage(4);
+                        } else {
+                            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+                            Ringtone rt = RingtoneManager.getRingtone(getApplicationContext(), uri);
+                            rt.play();
+                            handler.sendEmptyMessage(3);
+                        }
+                        zhaofangCount++;
+                    }
+                }).start();
+            }
+        });
+
+    }
+
+    int zhaofangCount = 0;
+
+    private String getWebContent(String url) {
+        String result = "";
+        try {
+            HttpClient httpclient = new HttpClient();
+            PostMethod httppost = new PostMethod(url);
+            httpclient.setTimeout(5000);
+            int response = httpclient.executeMethod(httppost);
+            if (response >= 200) {
+                result = httppost.getResponseBodyAsString();
+//              Log.d("TAG", "OK : " + result);
+            } else {
+                Log.d("TAG", "CUOWU : " + result);
+            }
+        } catch (Exception e) {
+            return "Fail to establish http connection!" + e.toString();
+        }
+        return result;
     }
 
     public static int getAvailableSimCardCount(Context context) {
@@ -238,6 +365,16 @@ public class MainActivity extends AppCompatActivity {
             et_phoneStartNum.setText(phoneNum);
             Intent intent = new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + phoneNum));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
             startActivity(intent);
 
             if (textViewLog.getLineCount() > 10 || textViewLog.getText().toString().contains("Log")) {
@@ -249,5 +386,6 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
+
 
 }
