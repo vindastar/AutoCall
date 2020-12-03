@@ -1,6 +1,7 @@
 package com.mm.autocall;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
@@ -46,8 +47,10 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
+
     EditText et_phoneStartNum, et_callPhoneCount, et_waitSecond, et_callSpace;
     Button btn_start, btn_pause, btn_check;
     TextView textViewLog;
@@ -67,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void handleMessage(@NonNull Message msg) {
-            Log.d("TAG", "收到handler, obj = " + msg.obj);
+            Log.d("TAG", "收到handler, obj = " + msg.obj + ",what = " + msg.what);
 
             super.handleMessage(msg);
             switch (msg.what) {
@@ -79,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
                             if (isRun) {
                                 if (curCount < callCount) {
                                     curCount++;
-                                    curPhoneNum = (Long.parseLong(curPhoneNum) + 1) + "";
+//                                    curPhoneNum = (Long.parseLong(curPhoneNum) + 1) + "";//不要加1,重复拨打同一个
                                     startWork(curPhoneNum, waitSecondSec);
                                 } else {
                                     curCount = 0;
@@ -95,17 +98,18 @@ public class MainActivity extends AppCompatActivity {
                     startWork(curPhoneNum, waitSecondSec);
                     break;
                 case 3:
-                    textViewLog.setText("快去自如等待租房子!");
+                    textViewLog.setText("快去自如等待租房子!~~~" + formatTime());
                     new Thread(new Runnable() {
                         @Override
                         public void run() {
                             try {
-                                doGet("https://sc.ftqq.com/SCU91479T874dbeeafc0118246217ec541e4cad175e7ee288d33e2.send?text=快去自如等待租房子~\n" + formatTime());
+                                doGet("https://sc.ftqq.com/SCU91479T874dbeeafc0118246217ec541e4cad175e7ee288d33e2.send?text=快去自如等待租房子~" + formatTime());
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
                         }
                     }).start();
+                    break;
                 case 4:
                     textViewLog.setText(formatTime() + ": 找房第  " + zhaofangCount + "  次");
                     handler.postDelayed(new Runnable() {
@@ -114,7 +118,8 @@ public class MainActivity extends AppCompatActivity {
                             textViewLog.setText(formatTime() + ": 找房第  " + zhaofangCount + "  次");
                             btn_check.callOnClick();
                         }
-                    }, 350 * 1000);
+                    }, 666 * 1000);
+                    break;
             }
         }
     };
@@ -131,8 +136,6 @@ public class MainActivity extends AppCompatActivity {
             conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             //设置连接超时时间和读取超时时间
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(60000);
             conn.setRequestProperty("Accept", "application/json");
             //发送请求
             conn.connect();
@@ -166,23 +169,35 @@ public class MainActivity extends AppCompatActivity {
         return result.toString();
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.P)
     private void endCall() {
         try {
             // 首先拿到TelephonyManager
-            TelephonyManager telMag = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
-            Class<TelephonyManager> c = TelephonyManager.class;
+            TelecomManager telMag = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
+            Class<TelecomManager> c = TelecomManager.class;
 
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
+            telMag.endCall();
             // 再去反射TelephonyManager里面的私有方法 getITelephony 得到 ITelephony对象
-            Method mthEndCall = c.getDeclaredMethod("getITelephony", (Class[]) null);
-            //允许访问私有方法
-            mthEndCall.setAccessible(true);
-            final Object obj = mthEndCall.invoke(telMag, (Object[]) null);
-
-            // 再通过ITelephony对象去反射里面的endCall方法，挂断电话
-            Method mt = obj.getClass().getMethod("endCall");
-            //允许访问私有方法
-            mt.setAccessible(true);
-            mt.invoke(obj);
+//            Method mthEndCall = c.getDeclaredMethod("getITelephony", (Class[]) null);
+//            //允许访问私有方法
+//            mthEndCall.setAccessible(true);
+//            final Object obj = mthEndCall.invoke(telMag, (Object[]) null);
+//
+//            // 再通过ITelephony对象去反射里面的endCall方法，挂断电话
+//            Method mt = obj.getClass().getMethod("endCall");
+//            //允许访问私有方法
+//            mt.setAccessible(true);
+//            mt.invoke(obj);
             Log.d("TAG", "挂断电话！");
         } catch (Exception e) {
             e.printStackTrace();
@@ -190,11 +205,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(mInnerOutCallReceiver);
+    }
+
+    private String startPhontNum = "18700172319";//19988880000
+    private OutGoingCallReceiver mInnerOutCallReceiver;
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         context = this;
-        et_phoneStartNum = (EditText) findViewById(R.id.startPhoneNum);
+        et_phoneStartNum = (EditText) findViewById(R.id.startPhoneNum);//
         et_callPhoneCount = (EditText) findViewById(R.id.callPhoneCount);
         et_waitSecond = (EditText) findViewById(R.id.waitSecond);
         et_callSpace = (EditText) findViewById(R.id.callSpace);
@@ -202,6 +226,8 @@ public class MainActivity extends AppCompatActivity {
         btn_pause = (Button) findViewById(R.id.btn_pause);
         btn_check = (Button) findViewById(R.id.btn_check);
         textViewLog = (TextView) findViewById(R.id.textViewLog);
+
+        et_phoneStartNum.setText(startPhontNum);
         /**
          * 在activity 或者 service中加入如下代码，以实现来电状态监听
          */
@@ -209,7 +235,7 @@ public class MainActivity extends AppCompatActivity {
         telMgr.listen(new TelListener(), PhoneStateListener.LISTEN_CALL_STATE);
 
         IntentFilter intentFilter = new IntentFilter(Intent.ACTION_NEW_OUTGOING_CALL);
-        OutGoingCallReceiver mInnerOutCallReceiver = new OutGoingCallReceiver();
+        mInnerOutCallReceiver = new OutGoingCallReceiver();
         registerReceiver(mInnerOutCallReceiver, intentFilter);
 
         btn_start.setOnClickListener(new View.OnClickListener() {
@@ -220,10 +246,34 @@ public class MainActivity extends AppCompatActivity {
                 btn_start.setEnabled(false);
                 btn_pause.setEnabled(true);
                 getAvailableSimCardCount(context);
-                curPhoneNum = et_phoneStartNum.getText().toString();
-                callCount = Integer.parseInt(et_callPhoneCount.getText().toString());
-                waitSecondSec = Integer.parseInt(et_waitSecond.getText().toString());
-                callSpace = Integer.parseInt(et_callSpace.getText().toString());
+
+
+                if (et_phoneStartNum.getText() == null) {
+                    et_phoneStartNum.setHint("靓仔 号码给一下啊");
+                } else {
+                    curPhoneNum = et_phoneStartNum.getText().toString();
+                }
+
+                if (et_callPhoneCount.getText() == null) {
+                    callCount = 100;
+                    et_callPhoneCount.setHint("靓仔 你想让我打几遍?");
+                } else {
+                    callCount = Integer.parseInt(et_callPhoneCount.getText().toString());
+                }
+
+                if (et_waitSecond.getText() == null) {
+                    waitSecondSec = 5;
+                    et_waitSecond.setHint("靓仔 那我不主动挂断了哦(0)");
+                } else {
+                    waitSecondSec = Integer.parseInt(et_waitSecond.getText().toString());
+                }
+                if (et_callSpace.getText() == null) {
+                    callSpace = 10;
+                    et_callSpace.setHint("靓仔 打一下要歇歇的啊");
+                } else {
+                    callSpace = Integer.parseInt(et_callSpace.getText().toString());
+                }
+
                 startWork(curPhoneNum, waitSecondSec);
             }
         });
@@ -244,19 +294,20 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onClick(View v) {
-
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
                         String s = getWebContent("http://sh.ziroom.com/x/807488012.html");
-                        Log.d("TAG", "XXXXXX s . length() " + s.length());
-                        if (s.contains("检测中") || s.length() < 500) {
-                            Log.d("TAG", "XXXXXXXXXXXXX");
+                        boolean cheking = s.contains("检测中");
+                        Log.d("TAG", "检测中=" + cheking + ", length() " + s.length());
+                        if (cheking || s.length() < 500) {
+                            Log.d("TAG", "XXXXXXXXXXXXX sendEmptyMessage(4)");
                             handler.sendEmptyMessage(4);
                         } else {
-                            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-                            Ringtone rt = RingtoneManager.getRingtone(getApplicationContext(), uri);
-                            rt.play();
+//                            Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+//                            Ringtone rt = RingtoneManager.getRingtone(getApplicationContext(), uri);
+//                            rt.play();
+                            Log.d("TAG", "XXXXXXXXXXXXX sendEmptyMessage(3)");
                             handler.sendEmptyMessage(3);
                         }
                         zhaofangCount++;
@@ -380,7 +431,11 @@ public class MainActivity extends AppCompatActivity {
             if (textViewLog.getLineCount() > 10 || textViewLog.getText().toString().contains("Log")) {
                 textViewLog.setText("");
             }
-            textViewLog.setText(textViewLog.getText() + formatTime() + "当前第: " + curCount + "," + phoneNum + "\n");
+            textViewLog.setText(textViewLog.getText() + formatTime() + "当前第: " + (curCount+1) + "," + phoneNum + "\n");
+
+            if(waitSecond<=5){
+                waitSecond=5;
+            }
             handler.sendEmptyMessageDelayed(1, waitSecond * 1000);
         } catch (Exception e) {
             e.printStackTrace();
