@@ -1,11 +1,9 @@
 package com.mm.autocall;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -46,8 +44,9 @@ import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends Activity {
     EditText et_phoneStartNum, et_callPhoneCount, et_waitSecond, et_callSpace;
     Button btn_start, btn_pause, btn_check;
     TextView textViewLog;
@@ -66,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
     Handler handler = new Handler() {
 
         @Override
-        public void handleMessage(@NonNull Message msg) {
+        public void handleMessage(Message msg) {
             Log.d("TAG", "收到handler, obj = " + msg.obj);
 
             super.handleMessage(msg);
@@ -100,7 +99,8 @@ public class MainActivity extends AppCompatActivity {
                         @Override
                         public void run() {
                             try {
-                                doGet("https://sc.ftqq.com/SCU91479T874dbeeafc0118246217ec541e4cad175e7ee288d33e2.send?text=快去自如等待租房子~\n" + formatTime());
+//                                doGet("https://sc.ftqq.com/SCU91479T874dbeeafc0118246217ec541e4cad175e7ee288d33e2.send?text=快去自如等待租房子~\n" + formatTime());
+                                doGet("https://sctapi.ftqq.com/SCT43555Td3iLKz21TnoGNGX2XGtEMkd0.send?title=快去自如等待租房子\n" + formatTime());
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
@@ -251,7 +251,7 @@ public class MainActivity extends AppCompatActivity {
                         String s = getWebContent("http://sh.ziroom.com/x/807488012.html");
                         Log.d("TAG", "XXXXXX s . length() " + s.length());
                         if (s.contains("检测中") || s.length() < 500) {
-                            Log.d("TAG", "XXXXXXXXXXXXX");
+                            Log.d("TAG", "检测中");
                             handler.sendEmptyMessage(4);
                         } else {
                             Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
@@ -288,21 +288,22 @@ public class MainActivity extends AppCompatActivity {
         return result;
     }
 
-    public static int getAvailableSimCardCount(Context context) {
+    public int getAvailableSimCardCount(Context context) {
         int count = 0;
         if (isMultiSim(context)) {
             //版本在21及以上
             SubscriptionManager mSubscriptionManager = SubscriptionManager.from(context);
             for (int i = 0; i < getSimCardCount(context); i++) {
-                if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+
+                if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
                     // TODO: Consider calling
-                    //    ActivityCompat#requestPermissions
+                    //    Activity#requestPermissions
                     // here to request the missing permissions, and then overriding
                     //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
                     //                                          int[] grantResults)
                     // to handle the case where the user grants the permission. See the documentation
-                    // for ActivityCompat#requestPermissions for more details.
-                    return -1;
+                    // for Activity#requestPermissions for more details.
+                    return 0;
                 }
                 SubscriptionInfo sir = mSubscriptionManager.getActiveSubscriptionInfoForSimSlotIndex(i);
                 if (sir != null) {
@@ -328,20 +329,20 @@ public class MainActivity extends AppCompatActivity {
         return -1;
     }
 
-    public static boolean isMultiSim(Context context) {
+    public boolean isMultiSim(Context context) {
         boolean result = false;
         //版本在21及以上
 
         TelecomManager telecomManager = (TelecomManager) context.getSystemService(Context.TELECOM_SERVICE);
         if (telecomManager != null) {
-            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
                 // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
+                //    Activity#requestPermissions
                 // here to request the missing permissions, and then overriding
                 //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
                 //                                          int[] grantResults)
                 // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
+                // for Activity#requestPermissions for more details.
                 return false;
             }
             List<PhoneAccountHandle> phoneAccountHandleList = telecomManager.getCallCapablePhoneAccounts();
@@ -352,36 +353,33 @@ public class MainActivity extends AppCompatActivity {
 
     public String formatTime() {
         Date date = new Date();
-        String str = "yyy-MM-dd HH:mm:ss";
-        SimpleDateFormat sdf = new SimpleDateFormat(str);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyy-MM-dd HH:mm:ss", Locale.CHINA);
         return sdf.format(date);
     }
 
-    @SuppressLint("SetTextI18n")
     private void startWork(String phoneNum, int waitSecond) {
         try {
             Log.d("TAG", "当前的电话是: " + phoneNum + ",目标数量是:" + callCount + ",当前已拨打:" + curCount + ",间隔:" + callSpace);
-
             et_phoneStartNum.setText(phoneNum);
             Intent intent = new Intent(Intent.ACTION_CALL, Uri.parse("tel:" + phoneNum));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                return;
-            }
+//            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+//                // TODO: Consider calling
+//                //    ActivityCompat#requestPermissions
+//                // here to request the missing permissions, and then overriding
+//                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+//                //                                          int[] grantResults)
+//                // to handle the case where the user grants the permission. See the documentation
+//                // for ActivityCompat#requestPermissions for more details.
+//                return;
+//            }
             startActivity(intent);
 
             if (textViewLog.getLineCount() > 10 || textViewLog.getText().toString().contains("Log")) {
                 textViewLog.setText("");
             }
             textViewLog.setText(textViewLog.getText() + formatTime() + "当前第: " + curCount + "," + phoneNum + "\n");
-            handler.sendEmptyMessageDelayed(1, waitSecond * 1000);
+            handler.sendEmptyMessageDelayed(1, waitSecond * 1000L);
         } catch (Exception e) {
             e.printStackTrace();
         }
